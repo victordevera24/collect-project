@@ -1,5 +1,5 @@
 from os import abort
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 urlpatterns = [
@@ -16,4 +16,6 @@ urlpatterns = [
     path('fish/<int:fish_id>/add_feeding/', views.add_feeding, name='add_feeding'),
     path('fish/<int:fish_id>/assoc_toy/<int:toy_id>/', views.assoc_toy, name='assoc_toy'),
     path('fish/<int:fish_id>/add_photo/', views.add_photo, name='add_photo'),
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('accounts/signup/', views.signup, name='signup'),
 ]

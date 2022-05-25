@@ -6,6 +6,10 @@ from .models import Fish, Toy, Photo
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 from django.urls import reverse
 from .forms import FeedingForm
+from django.contrib.auth import login
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 # Add the following import
 from django.http import HttpResponse
@@ -29,15 +33,17 @@ def about(request):
     """
     return render(request, 'about.html')
 
+@login_required
 def fish_index(request):
     """
     fish index pages
     http://localhost:8000/fish/
     """
     logging.info('calling fish_index')
-    fish = Fish.objects.all()
+    fish = Fish.objects.filter(user=request.user)
     return render(request, 'fish/index.html', {'fish' : fish})
 
+@login_required
 def fish_detail(request, fish_id):
     fish = Fish.objects.get(id=fish_id)
     toys_fish_doesnt_have = Toy.objects.exclude(id__in = fish.toys.all().values_list('id'))
@@ -48,21 +54,27 @@ def fish_detail(request, fish_id):
         'toys': toys_fish_doesnt_have
     })
 
-class FishCreate(CreateView):
+class FishCreate(LoginRequiredMixin, CreateView):
     model = Fish
     fields = ['name', 'size', 'description']
+
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        return super().form_valid(form)
+
     def get_success_url(self, **kwargs):
         return reverse('detail', args=(self.object.id,))
 
-class FishUpdate(UpdateView):
+class FishUpdate(LoginRequiredMixin, UpdateView):
     model = Fish
     fields = ['description']
     success_url = '/fish/'
 
-class FishDelete(DeleteView):
+class FishDelete(LoginRequiredMixin, DeleteView):
     model = Fish
     success_url = '/fish/'
 
+@login_required
 def add_feeding(request, fish_id):
     # create a ModelForm instance using the data in request.POST
     form = FeedingForm(request.POST)
@@ -75,10 +87,12 @@ def add_feeding(request, fish_id):
         new_feeding.save()
     return redirect('detail', fish_id=fish_id)
 
+@login_required
 def assoc_toy(request, fish_id, toy_id):
     Fish.objects.get(id=fish_id).toys.add(toy_id)
     return redirect('detail', fish_id=fish_id)
 
+@login_required
 def add_photo(request, fish_id):
     # photo-file will be the "name" attribute on the <input type="file">
     photo_file = request.FILES.get('photo-file', None)
@@ -97,3 +111,17 @@ def add_photo(request, fish_id):
         except:
             print('An error occurred uploading file to S3')
     return redirect('detail', fish_id=fish_id)
+
+def signup(request):
+    error_message = ''
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('index')
+        else:
+            error_message = 'Invalid sign up - try again'
+    form = UserCreationForm()
+    context = {'form': form, 'error_message': error_message}
+    return render(request, 'registration/signup.html', context)
